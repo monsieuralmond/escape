@@ -1,1 +1,345 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>안전한 물놀이 방탈출</title>
+    <style>
+        /* CSS 코드 시작 */
 
+        /* 기본 스타일 */
+        body { margin: 0; font-family: 'Malgun Gothic', sans-serif; background-color: #333; display: flex; justify-content: center; align-items: center; height: 100vh; color: #333; }
+        .hidden { display: none !important; }
+
+        /* 시작 화면 */
+        #start-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 200; }
+        .start-box { background-color: white; padding: 40px 50px; border-radius: 15px; text-align: center; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+        .start-box h1 { margin-top: 0; color: #007bff; }
+        .start-box p { margin-bottom: 25px; }
+        .start-box input { display: block; width: 280px; padding: 12px; margin: 10px auto; font-size: 1em; border: 1px solid #ccc; border-radius: 5px; }
+        .start-box button { margin-top: 20px; padding: 12px 30px; font-size: 1.1em; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 5px; transition: background-color 0.2s; }
+        .start-box button:hover { background-color: #0056b3; }
+
+        /* 타이머 */
+        #timer { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background-color: rgba(0, 0, 0, 0.7); color: white; padding: 10px 25px; border-radius: 20px; font-size: 1.5em; font-weight: bold; z-index: 10; }
+
+        /* 게임 컨테이너 */
+        #game-container { position: relative; width: 1200px; height: 800px; max-width: 95vw; max-height: calc(95vw * 0.667); }
+        .room-bg { width: 100%; height: 100%; }
+
+        /* 클릭 가능한 오브젝트 */
+        .clickable-object {
+            position: absolute;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            z-index: 5; /* [수정] 클릭 영역이 항상 위에 오도록 보장 */
+            /* 개발 중 위치 확인용: border: 2px solid red; */
+        }
+        .clickable-object:hover { background-color: rgba(255, 255, 0, 0.3); }
+
+        /* 오브젝트 위치 */
+        #obj-monitor { top: 58%; left: 22%; width: 9%; height: 14%; }
+        #obj-speaker { top: 15%; left: 38%; width: 5%; height: 10%; }
+        #obj-clock { top: 9.5%; left: 59%; width: 7.5%; height: 12%; }
+        #obj-chalkboard { top: 28%; left: 5%; width: 38%; height: 27%; }
+        #obj-door { top: 27%; left: 45%; width: 12%; height: 58%; }
+
+        /* 단서 보드 */
+        #clue-board { position: fixed; top: 20px; right: 20px; background-color: rgba(255, 255, 255, 0.9); border: 3px solid #007bff; border-radius: 10px; padding: 10px 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 10; }
+        #clue-board h2 { margin-top: 0; }
+        #clue-board ul { list-style: none; padding: 0; }
+        
+        /* 모달 공통 */
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); justify-content: center; align-items: center; }
+        .modal-content { background-color: #fff; padding: 25px; border-radius: 10px; text-align: center; width: 90%; max-width: 450px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-content input, .modal-content textarea { width: 80%; padding: 10px; margin: 10px 0; font-size: 1em; border: 1px solid #ccc; border-radius: 5px; }
+        .modal-content textarea { height: 80px; resize: vertical; }
+        .modal-content button { padding: 10px 20px; font-size: 1em; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 5px; }
+        .modal-content button:hover { background-color: #0056b3; }
+
+        /* 메모리 게임 */
+        #memory-game-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
+        .card { width: 100%; aspect-ratio: 1 / 1; background-color: #4a90e2; border-radius: 5px; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 2em; perspective: 1000px; }
+        .card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; }
+        .card.flipped .card-inner { transform: rotateY(180deg); }
+        .card-front, .card-back { position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; border-radius: 5px; }
+        .card-front { background-color: #4a90e2; }
+        .card-back { background-color: #f5a623; transform: rotateY(180deg); display: flex; justify-content: center; align-items: center; font-size: 2em; }
+        .card.matched { cursor: default; background-color: #ccc; opacity: 0.6; }
+    </style>
+</head>
+<body>
+
+    <!-- 시작 화면 -->
+    <div id="start-screen">
+        <div class="start-box">
+            <h1>안전한 물놀이 방탈출</h1>
+            <p>탈출 미션을 시작하려면 정보를 입력해주세요!</p>
+            <input type="text" id="grade-input" placeholder="학년 (예: 6)">
+            <input type="text" id="class-input" placeholder="반 (예: 1)">
+            <input type="text" id="name-input" placeholder="이름 (예: 홍길동)">
+            <button id="start-button">게임 시작</button>
+        </div>
+    </div>
+
+    <!-- 타이머 표시 영역 -->
+    <div id="timer" class="hidden">소요 시간: 00:00</div>
+
+    <!-- 게임 관련 요소 -->
+    <div id="game-container" class="hidden">
+        <img src="https://i.postimg.cc/0QR7zt07/Whisk-storyboard49b8b41229eb439abe7cb9a1.jpg" alt="교실 배경" class="room-bg">
+        <div class="clickable-object" id="obj-monitor" title="모니터"></div>
+        <div class="clickable-object" id="obj-speaker" title="스피커"></div>
+        <div class="clickable-object" id="obj-clock" title="시계"></div>
+        <div class="clickable-object" id="obj-chalkboard" title="칠판"></div>
+        <div class="clickable-object" id="obj-door" title="교실 문"></div>
+    </div>
+    <div id="clue-board" class="hidden">
+        <h2>획득한 단서</h2>
+        <ul>
+            <li id="clue1">첫 번째 숫자: ?</li>
+            <li id="clue2">두 번째 숫자: ?</li>
+            <li id="clue3">세 번째 숫자: ?</li>
+            <li id="clue4">네 번째 숫자: ?</li>
+        </ul>
+    </div>
+
+    <!-- 모달들 -->
+    <div id="puzzle-modal" class="modal"><div class="modal-content"><h2 id="puzzle-title"></h2><p id="puzzle-question"></p><input type="text" id="puzzle-answer" placeholder="정답을 입력하세요"><button id="puzzle-submit">확인</button><p id="puzzle-feedback"></p></div></div>
+    <div id="memory-game-modal" class="modal"><div class="modal-content"><h2>미니게임: 안전 수칙 카드 맞추기</h2><p>같은 그림의 카드를 찾아 짝을 맞추세요!</p><div id="memory-game-board"></div><button id="memory-game-close" style="display:none;">닫기</button></div></div>
+    <div id="password-modal" class="modal"><div class="modal-content"><h2>교실 문이 잠겨있다</h2><p>4자리 비밀번호를 입력하여 탈출하세요.</p><input type="text" id="password-input" placeholder="비밀번호 4자리" maxlength="4"><button id="password-submit">탈출하기</button></div></div>
+    <div id="comment-modal" class="modal"><div class="modal-content"><h2>🎉 탈출 성공! 🎉</h2><p>축하합니다! 방탈출에 성공했습니다!</p><p><strong>최종 소요 시간: <span id="final-time"></span></strong></p><textarea id="comment-input" placeholder="게임에 대한 소감을 남겨주세요."></textarea><button id="comment-submit">결과 제출하기</button></div></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // ★★★ 여기에 복사한 웹 앱 URL을 붙여넣으세요! ★★★
+            const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxt_kbQ7FKYNvjWGQ-mdFHCqMYikuvUt_kSGo4_bmn8Bq2jV-cA6tV0VwVeHShH9XSD/exec세요';
+
+            // --- 변수 선언 ---
+            const startScreen = document.getElementById('start-screen');
+            const startButton = document.getElementById('start-button');
+            const gradeInput = document.getElementById('grade-input');
+            const classInput = document.getElementById('class-input');
+            const nameInput = document.getElementById('name-input');
+            const gameContainer = document.getElementById('game-container');
+            const clueBoard = document.getElementById('clue-board');
+            const timerDisplay = document.getElementById('timer');
+            const commentModal = document.getElementById('comment-modal');
+            const finalPassword = '2025';
+            
+            let timerInterval;
+            let startTime;
+            let userInfo = { grade: '', class: '', name: '' };
+            let clues = { 1: '?', 2: '?', 3: '?', 4: '?' };
+            let solved = { monitor: false, clock: false, chalkboard: false };
+
+            // --- 시작 화면 및 타이머 로직 ---
+            startButton.addEventListener('click', () => {
+                const gradeValue = gradeInput.value.trim();
+                const classValue = classInput.value.trim();
+                const nameValue = nameInput.value.trim();
+
+                if (!gradeValue || !classValue || !nameValue) {
+                    alert('학년, 반, 이름을 모두 입력해주세요!');
+                    return;
+                }
+                
+                userInfo = { grade: gradeValue, class: classValue, name: nameValue };
+
+                startScreen.classList.add('hidden');
+                gameContainer.classList.remove('hidden');
+                clueBoard.classList.remove('hidden');
+                timerDisplay.classList.remove('hidden');
+                
+                startTime = new Date();
+                timerInterval = setInterval(updateTimer, 1000);
+            });
+
+            function updateTimer() {
+                const now = new Date();
+                const elapsedTime = Math.floor((now - startTime) / 1000);
+                const minutes = Math.floor(elapsedTime / 60);
+                const seconds = elapsedTime % 60;
+                timerDisplay.textContent = `소요 시간: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }
+
+            // --- [수정] 모든 게임 로직을 여기에 정상적인 코드로 복원 ---
+
+            // DOM 요소 가져오기
+            const monitorObj = document.getElementById('obj-monitor');
+            const speakerObj = document.getElementById('obj-speaker');
+            const clockObj = document.getElementById('obj-clock');
+            const chalkboardObj = document.getElementById('obj-chalkboard');
+            const doorObj = document.getElementById('obj-door');
+            const puzzleModal = document.getElementById('puzzle-modal');
+            const memoryGameModal = document.getElementById('memory-game-modal');
+            const passwordModal = document.getElementById('password-modal');
+
+            // 이벤트 리스너 설정
+            monitorObj.addEventListener('click', () => {
+                if (solved.monitor) { alert('이미 해결한 문제입니다.'); return; }
+                showPuzzle('monitor', '물놀이 안전 문제', '물에 들어가기 전, 반드시 해야 하는 준비 운동의 최소 시간은 몇 분일까요? (숫자만 입력)', '2');
+            });
+            speakerObj.addEventListener('click', () => {
+                alert('[안내방송] "삐... 식사 후 바로 물에 들어가는 것은 위험합니다. 시간을 잘 확인하세요... 삐..."');
+            });
+            clockObj.addEventListener('click', () => {
+                if (solved.clock) { alert('이미 해결한 문제입니다.'); return; }
+                showPuzzle('clock', '수영 시간 문제', '음식을 먹고 난 후, 최소 몇 시간 뒤에 물놀이를 하는 것이 안전할까요? (숫자만 입력)', '2');
+            });
+            chalkboardObj.addEventListener('click', () => {
+                if (solved.chalkboard) { alert('이미 미니게임을 완료했습니다.'); return; }
+                memoryGameModal.style.display = 'flex';
+                initializeMemoryGame();
+            });
+            doorObj.addEventListener('click', () => {
+                passwordModal.style.display = 'flex';
+            });
+            
+            function updateClueBoard() {
+                document.getElementById('clue1').textContent = `첫 번째 숫자: ${clues[1]}`;
+                document.getElementById('clue2').textContent = `두 번째 숫자: ${clues[2]}`;
+                document.getElementById('clue3').textContent = `세 번째 숫자: ${clues[3]}`;
+                document.getElementById('clue4').textContent = `네 번째 숫자: ${clues[4]}`;
+            }
+
+            function showPuzzle(puzzleId, title, question, answer) {
+                document.getElementById('puzzle-title').textContent = title;
+                document.getElementById('puzzle-question').textContent = question;
+                document.getElementById('puzzle-answer').value = '';
+                document.getElementById('puzzle-feedback').textContent = '';
+                puzzleModal.style.display = 'flex';
+
+                const submitButton = document.getElementById('puzzle-submit');
+                const newButton = submitButton.cloneNode(true);
+                submitButton.parentNode.replaceChild(newButton, submitButton);
+
+                newButton.addEventListener('click', () => {
+                    const userAnswer = document.getElementById('puzzle-answer').value.trim();
+                    if (userAnswer === answer) {
+                        document.getElementById('puzzle-feedback').textContent = '정답입니다! 단서를 획득했습니다.';
+                        if (puzzleId === 'monitor') { clues[1] = '2'; solved.monitor = true; } 
+                        else if (puzzleId === 'clock') { clues[3] = '2'; solved.clock = true; }
+                        updateClueBoard();
+                        setTimeout(() => { puzzleModal.style.display = 'none'; }, 1500);
+                    } else {
+                        document.getElementById('puzzle-feedback').textContent = '틀렸습니다. 다시 생각해보세요.';
+                    }
+                });
+            }
+
+            const memoryGameBoard = document.getElementById('memory-game-board');
+            const memoryGameCloseBtn = document.getElementById('memory-game-close');
+            let cards = ['💧', '☀️', '튜브', '조끼', '💧', '☀️', '튜브', '조끼'];
+            let flippedCards = [];
+            let matchedPairs = 0;
+
+            function initializeMemoryGame() {
+                matchedPairs = 0;
+                flippedCards = [];
+                memoryGameBoard.innerHTML = '';
+                memoryGameCloseBtn.style.display = 'none';
+                for (let i = cards.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [cards[i], cards[j]] = [cards[j], cards[i]];
+                }
+                cards.forEach(item => {
+                    const cardElement = document.createElement('div');
+                    cardElement.classList.add('card');
+                    cardElement.dataset.value = item;
+                    cardElement.innerHTML = `<div class="card-inner"><div class="card-front"></div><div class="card-back">${item}</div></div>`;
+                    cardElement.addEventListener('click', () => {
+                        if (flippedCards.length < 2 && !cardElement.classList.contains('flipped')) {
+                            cardElement.classList.add('flipped');
+                            flippedCards.push(cardElement);
+                            if (flippedCards.length === 2) { setTimeout(checkForMatch, 500); }
+                        }
+                    });
+                    memoryGameBoard.appendChild(cardElement);
+                });
+            }
+
+            function checkForMatch() {
+                const [card1, card2] = flippedCards;
+                if (card1.dataset.value === card2.dataset.value) {
+                    card1.classList.add('matched');
+                    card2.classList.add('matched');
+                    matchedPairs++;
+                    if (matchedPairs === cards.length / 2) {
+                        setTimeout(() => {
+                            alert('미니게임 성공! 비밀번호의 두 번째, 네 번째 숫자를 획득했습니다!');
+                            clues[2] = '0';
+                            clues[4] = '5';
+                            solved.chalkboard = true;
+                            updateClueBoard();
+                            memoryGameCloseBtn.style.display = 'inline-block';
+                        }, 500);
+                    }
+                } else {
+                    card1.classList.remove('flipped');
+                    card2.classList.remove('flipped');
+                }
+                flippedCards = [];
+            }
+            
+            memoryGameCloseBtn.addEventListener('click', () => { memoryGameModal.style.display = 'none'; });
+
+            // --- 탈출 및 제출 로직 ---
+            document.getElementById('password-submit').addEventListener('click', () => {
+                const input = document.getElementById('password-input').value;
+                if (input === finalPassword) {
+                    clearInterval(timerInterval);
+                    passwordModal.style.display = 'none';
+                    document.getElementById('final-time').textContent = timerDisplay.textContent.replace('소요 시간: ', '');
+                    commentModal.style.display = 'flex';
+                } else {
+                    alert('비밀번호가 틀렸습니다. 획득한 단서를 다시 확인해보세요.');
+                }
+            });
+
+            document.getElementById('comment-submit').addEventListener('click', (e) => {
+                // SCRIPT_URL이 없으면 제출하지 않음
+                if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxt_kbQ7FKYNvjWGQ-mdFHCqMYikuvUt_kSGo4_bmn8Bq2jV-cA6tV0VwVeHShH9XSD/exec요') {
+                    alert('결과 제출 기능이 아직 설정되지 않았습니다. 관리자에게 문의하세요.');
+                    return;
+                }
+                
+                const submitButton = e.target;
+                submitButton.disabled = true;
+                submitButton.textContent = '제출 중...';
+
+                const data = {
+                    grade: userInfo.grade,
+                    className: userInfo.class,
+                    name: userInfo.name,
+                    time: document.getElementById('final-time').textContent,
+                    comment: document.getElementById('comment-input').value.trim()
+                };
+
+                fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify(data)
+                })
+                .then(res => {
+                    alert('결과가 성공적으로 제출되었습니다. 감사합니다!');
+                    commentModal.style.display = 'none';
+                    window.location.reload(); 
+                })
+                .catch(error => {
+                    console.error('Error!', error);
+                    alert('오류가 발생하여 결과를 제출하지 못했습니다.');
+                    submitButton.disabled = false;
+                    submitButton.textContent = '결과 제출하기';
+                });
+            });
+
+            // 모달 밖 클릭 시 닫기
+            window.addEventListener('click', (e) => {
+                if (e.target === puzzleModal) puzzleModal.style.display = 'none';
+                if (e.target === passwordModal) passwordModal.style.display = 'none';
+            });
+        });
+    </script>
+</body>
+</html>
